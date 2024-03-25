@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract RescueCenterDAO {
+    address public owner;
+    uint256 public totalDonations;
+
+    struct RescueCenter {
+        string name;
+        address centerAddress;
+        uint256 resourcesReceived;
+        bool isRegistered;
+    }
+
+    struct Donation {
+        address donor;
+        uint256 amount;
+    }
+
+    mapping(address => RescueCenter) public rescueCenters;
+    mapping(address => Donation[]) public donations;
+
+    event RescueCenterAdded(string name, address centerAddress);
+    event DonationReceived(address indexed donor, uint256 amount);
+    event ResourcesAllocated(address centerAddress, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can perform this action.");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function addRescueCenter(string memory _name, address _centerAddress) public onlyOwner {
+        require(!rescueCenters[_centerAddress].isRegistered, "Center already registered.");
+        rescueCenters[_centerAddress] = RescueCenter(_name, _centerAddress, 0, true);
+        emit RescueCenterAdded(_name, _centerAddress);
+    }
+
+    function donateToCenter(address _centerAddress) public payable {
+        require(rescueCenters[_centerAddress].isRegistered, "Center not registered.");
+        donations[_centerAddress].push(Donation(msg.sender, msg.value));
+        rescueCenters[_centerAddress].resourcesReceived += msg.value;
+        totalDonations += msg.value;
+        emit DonationReceived(msg.sender, msg.value);
+    }
+
+    function allocateResources(address _centerAddress, uint256 _amount) public onlyOwner {
+        require(rescueCenters[_centerAddress].isRegistered, "Center not registered.");
+        require(rescueCenters[_centerAddress].resourcesReceived >= _amount, "Insufficient resources.");
+        
+        payable(_centerAddress).transfer(_amount);
+        rescueCenters[_centerAddress].resourcesReceived -= _amount;
+        emit ResourcesAllocated(_centerAddress, _amount);
+    }
+
+    function getDonationsForCenter(address _centerAddress) public view returns (Donation[] memory) {
+        return donations[_centerAddress];
+    }
+}
